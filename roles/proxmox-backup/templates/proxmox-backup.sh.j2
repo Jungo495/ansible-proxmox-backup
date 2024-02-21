@@ -1,0 +1,51 @@
+#!/bin/bash
+
+{% for key in proxmox_backup_plan.ct %}
+# begin dump for ct {{ key.ctid }}
+echo "Remove old local dump"
+rm -f {{ proxmox_client_dump_dir }}/*{{ key.ctid }}*
+echo "Begin dump"
+vzdump {{ key.ctid }} --stdexcludes
+{%- if key.exclude_path is defined %}
+{% for path in key.exclude_path %}
+ --exclude-path={{ path }}
+{%- endfor %}
+
+{%- endif %}
+ --mode=snapshot --dumpdir={{ proxmox_client_dump_dir }}/ --compress=lzo
+/usr/bin/ssh -i /{{ proxmox_client_backup_user }}/.ssh/{{ ansible_nodename }} -o "StrictHostKeyChecking no" {{ proxmox_backup_user }}@{{ proxmox_backup_server }} -p {{ proxmox_backup_port }} 'mkdir -p {{ proxmox_backup_dir }}/ct/{{ inventory_hostname }}/{{ key.ctid }}'
+rsync -av --progress --bwlimit=10000 -e 'ssh -i /{{ proxmox_client_backup_user }}/.ssh/{{ ansible_nodename }} -o "StrictHostKeyChecking no" -p {{ proxmox_backup_port }}' /var/lib/vz/dump/*{{ key.ctid }}* {{ proxmox_backup_user }}@{{ proxmox_backup_server }}:{{ proxmox_backup_dir }}/ct/{{ inventory_hostname }}/{{ key.ctid }}/
+echo "Rotate remote dumps"
+/usr/bin/ssh -i /{{ proxmox_client_backup_user }}/.ssh/{{ ansible_nodename }} -o "StrictHostKeyChecking no" {{ proxmox_backup_user }}@{{ proxmox_backup_server }} -p {{ proxmox_backup_port }} <<-EOF
+ cd {{ proxmox_backup_dir }}/ct/{{ inventory_hostname }}/{{ key.ctid }}
+ ls -1t {{ proxmox_backup_dir }}/ct/{{ inventory_hostname }}/{{ key.ctid }} | grep log | tail -n +{{ key.keep | default( proxmox_keep ) }} | xargs rm -f
+ ls -1t {{ proxmox_backup_dir }}/ct/{{ inventory_hostname }}/{{ key.ctid }} | grep lzo | tail -n +{{ key.keep | default( proxmox_keep ) }} | xargs rm -f
+EOF
+echo "Remove local dump"
+rm -f {{ proxmox_client_dump_dir }}/*{{ key.ctid }}*
+# end dump for ct {{ key.ctid }}
+
+{% endfor %}
+
+
+{% if proxmox_backup_plan.vm is defined %}
+{% for key in proxmox_backup_plan.vm %}
+# begin dump for vm {{ key.vmid }}
+echo "Remove old local dump"
+rm -f {{ proxmox_client_dump_dir }}/*{{ key.vmid }}*
+echo "Begin dump"
+vzdump {{ key.vmid }} --remove 1 --compress lzo --mode snapshot --dumpdir={{ proxmox_client_dump_dir }}/
+/usr/bin/ssh -i /{{ proxmox_client_backup_user }}/.ssh/{{ ansible_nodename }} -o "StrictHostKeyChecking no" {{ proxmox_backup_user }}@{{ proxmox_backup_server }} -p {{ proxmox_backup_port }} 'mkdir -p {{ proxmox_backup_dir }}/vm/{{ inventory_hostname }}/{{ key.vmid }}'
+rsync -av --progress --bwlimit=10000 -e 'ssh -i /{{ proxmox_client_backup_user }}/.ssh/{{ ansible_nodename }} -o "StrictHostKeyChecking no" -p {{ proxmox_backup_port }}' /var/lib/vz/dump/*{{ key.vmid }}* {{ proxmox_backup_user }}@{{ proxmox_backup_server }}:{{ proxmox_backup_dir }}/vm/{{ inventory_hostname }}/{{ key.vmid }}/
+echo "Rotate remote dumps"
+/usr/bin/ssh -i /{{ proxmox_client_backup_user }}/.ssh/{{ ansible_nodename }} -o "StrictHostKeyChecking no" {{ proxmox_backup_user }}@{{ proxmox_backup_server }} -p {{ proxmox_backup_port }} <<-EOF
+ cd {{ proxmox_backup_dir }}/vm/{{ inventory_hostname }}/{{ key.vmid }}
+ ls -1t {{ proxmox_backup_dir }}/vm/{{ inventory_hostname }}/{{ key.vmid }} | grep log | tail -n +{{ key.keep | default( proxmox_keep ) }} | xargs rm -f
+ ls -1t {{ proxmox_backup_dir }}/vm/{{ inventory_hostname }}/{{ key.vmid }} | grep lzo | tail -n +{{ key.keep | default( proxmox_keep ) }} | xargs rm -f
+EOF
+echo "Remove local dump"
+rm -f {{ proxmox_client_dump_dir }}/*{{ key.vmid }}*
+# end dump for vm {{ key.vmid }}
+
+{% endfor %}
+{% endif %}

@@ -1,0 +1,11 @@
+---
+# file: tasks/main.yml
+
+- meta: end_host
+  when: proxmox_backup_plan is not defined
+
+- include_tasks: key_generator.yml
+- include_tasks: deploy_client.yml
+- include_tasks: cron_client.yml
+- include_tasks: deploy_server.yml
+#- include_tasks: key_cleaner.yml

@@ -1,0 +1,23 @@
+---
+# file: tasks/deploy_client.yml
+
+- name: Ensure client script dir exists
+  file:
+    path: "{{ proxmox_client_script_dir }}"
+    state: directory
+
+- name: Deploy CT backup script
+  template:
+    src: proxmox-backup.sh.j2
+    dest: "{{ proxmox_client_script_dir }}/{{ proxmox_client_script_name }}"
+    mode: 0750
+  with_dict: "{{ proxmox_backup_plan }}"
+  when: proxmox_backup_plan is defined
+
+- name: Set private key taken from file on client
+  copy:
+    src="{{ proxmox_local_key_dir }}/{{ ansible_nodename }}"
+    dest="{{ proxmox_client_backup_user_homedir }}/.ssh/"
+    owner="{{ proxmox_client_backup_user }}"
+    group="{{ proxmox_client_backup_user }}"
+    mode=0600

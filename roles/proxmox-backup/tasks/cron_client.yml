@@ -1,0 +1,32 @@
+---
+# file: tasks/cron.yml
+- name: Clear proxmox backup script in client crontab
+  cron:
+    name: "Clear job"
+    user: root
+    cron_file: proxmox_backup
+    state: absent
+
+- name: Make log directory
+  file:
+    path: /var/log/proxmox-backup
+    state: directory
+
+- name: Deploy logrotate config
+  template:
+    src: logrotate.j2
+    dest: "/etc/logrotate.d/proxmox_backup"
+    mode: 0644
+
+- name: Add proxmox backup script in client crontab
+  cron:
+    name: "Proxmox backup {{ ansible_nodename }}"
+    #job: "/usr/bin/nice -n 15 /usr/bin/flock -w 600 /tmp/proxmox-{{ ansible_nodename }}.lock {{ proxmox_client_script_dir }}/{{ proxmox_client_script_name }} > /dev/null 2>&1"
+    job: "/usr/bin/nice -n 15 /usr/bin/flock -w 600 /tmp/proxmox-{{ ansible_nodename }}.lock {{ proxmox_client_script_dir }}/{{ proxmox_client_script_name }} >> /var/log/proxmox-backup/work.log 2>&1"
+    user: root
+    minute: "{{ item.minute }}"
+    hour: "{{ item.hour }}"
+    day: "{{ item.day }}"
+    cron_file: proxmox_backup
+  with_items: "{{ proxmox_backup_time | default({}) }}"
+  when: proxmox_backup_time is defined

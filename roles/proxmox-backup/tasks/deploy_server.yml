@@ -1,0 +1,25 @@
+---
+# file: tasks/deploy_server.yml
+
+- name: Add a temporary host alias for backup server(s)
+  add_host:
+    hostname: "{{ proxmox_backup_server }}"
+    ansible_ssh_host: "{{ proxmox_backup_server }}"
+    ansible_ssh_port: "{{ proxmox_backup_port }}"
+
+- name: Create backup user on server
+  user:
+    name: "{{ proxmox_backup_user }}"
+    comment: Ansible managed backup user
+    home: "{{ proxmox_backup_dir }}"
+  delegate_to: "{{ proxmox_backup_server }}"
+
+- name: Set authorized key for backup user on server
+  authorized_key:
+    user: "{{ proxmox_backup_user }}"
+    state: present
+    key: "{{ lookup('file', '{{ proxmox_local_key_dir }}/{{ ansible_nodename }}.pub') }}"
+    exclusive: false
+  delegate_to: "{{ proxmox_backup_server }}"
+
+

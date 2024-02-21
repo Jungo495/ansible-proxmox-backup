@@ -1,0 +1,18 @@
+---
+# file: tasks/deploy_client.yml
+
+- name: Ensure local key dir exists
+  become: no
+  file:
+    path: "{{ proxmox_local_key_dir }}"
+    state: directory
+  delegate_to: "localhost"
+
+- name: Generate local backup keypair
+  become: no
+  openssh_keypair:
+    path: "{{ proxmox_local_key_dir }}/{{ ansible_nodename }}"
+    size: 4096
+    comment: "{{ ansible_nodename }}"
+  delegate_to: "localhost"
+  delegate_facts: true
